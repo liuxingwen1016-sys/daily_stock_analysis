@@ -96,6 +96,7 @@ from api.v1.schemas.portfolio import (
     PortfolioDecisionSignalRiskBlock,
     PortfolioDecisionSignalRiskItem,
     PortfolioRiskResponse,
+    PersonalQuantDashboardResponse,
 )
 from api.v1.schemas.alerts import (
     AlertDeleteResponse,
@@ -213,6 +214,7 @@ __all__ = [
     "PortfolioDecisionSignalRiskBlock",
     "PortfolioDecisionSignalRiskItem",
     "PortfolioRiskResponse",
+    "PersonalQuantDashboardResponse",
     # alerts
     "AlertDeleteResponse",
     "AlertNotificationItem",

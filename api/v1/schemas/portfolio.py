@@ -15,6 +15,9 @@ class PortfolioAccountCreateRequest(BaseModel):
     market: Literal["cn", "hk", "us", "jp", "kr", "tw"] = "cn"
     base_currency: str = Field("CNY", min_length=3, max_length=8)
     owner_id: Optional[str] = Field(None, max_length=64)
+    account_type: Literal["cash", "margin"] = "cash"
+    financing_debt: float = Field(0.0, ge=0)
+    min_maintenance_ratio: float = Field(1.5, gt=0)
 
 
 class PortfolioAccountUpdateRequest(BaseModel):
@@ -23,6 +26,9 @@ class PortfolioAccountUpdateRequest(BaseModel):
     market: Optional[Literal["cn", "hk", "us", "jp", "kr", "tw"]] = None
     base_currency: Optional[str] = Field(None, min_length=3, max_length=8)
     owner_id: Optional[str] = Field(None, max_length=64)
+    account_type: Optional[Literal["cash", "margin"]] = None
+    financing_debt: Optional[float] = Field(None, ge=0)
+    min_maintenance_ratio: Optional[float] = Field(None, gt=0)
     is_active: Optional[bool] = None
 
 
@@ -33,6 +39,9 @@ class PortfolioAccountItem(BaseModel):
     broker: Optional[str] = None
     market: str
     base_currency: str
+    account_type: str = "cash"
+    financing_debt: float = 0.0
+    min_maintenance_ratio: float = 1.5
     is_active: bool
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -183,6 +192,11 @@ class PortfolioAccountSnapshot(BaseModel):
     broker: Optional[str] = None
     market: str
     base_currency: str
+    account_type: str = "cash"
+    financing_debt: float = 0.0
+    net_asset: float = 0.0
+    maintenance_ratio: Optional[float] = None
+    min_maintenance_ratio: float = 1.5
     as_of: str
     cost_method: str
     total_cash: float
@@ -293,4 +307,18 @@ class PortfolioRiskResponse(BaseModel):
     sector_concentration: Dict[str, Any] = Field(default_factory=dict)
     drawdown: Dict[str, Any] = Field(default_factory=dict)
     stop_loss: Dict[str, Any] = Field(default_factory=dict)
+    margin_risk: Dict[str, Any] = Field(default_factory=dict)
     decision_signal_risk: PortfolioDecisionSignalRiskBlock = Field(default_factory=PortfolioDecisionSignalRiskBlock)
+
+
+class PersonalQuantDashboardResponse(BaseModel):
+    as_of: str
+    cost_method: str
+    currency: str
+    summary: Dict[str, Any] = Field(default_factory=dict)
+    principles: List[Dict[str, Any]] = Field(default_factory=list)
+    account_templates: List[Dict[str, Any]] = Field(default_factory=list)
+    accounts: List[Dict[str, Any]] = Field(default_factory=list)
+    top_positions: List[Dict[str, Any]] = Field(default_factory=list)
+    risk_events: List[Dict[str, Any]] = Field(default_factory=list)
+    action_plan: List[Dict[str, Any]] = Field(default_factory=list)

@@ -29,6 +29,7 @@ from api.v1.schemas.portfolio import (
     PortfolioImportCommitResponse,
     PortfolioImportParseResponse,
     PortfolioImportTradeItem,
+    PersonalQuantDashboardResponse,
     PortfolioPositionAnalysisRequest,
     PortfolioRiskResponse,
     PortfolioSnapshotResponse,
@@ -37,6 +38,7 @@ from api.v1.schemas.portfolio import (
 )
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import PortfolioImportService
+from src.services.personal_quant_service import PersonalQuantService
 from src.services.portfolio_risk_service import PortfolioRiskService
 from src.services.portfolio_service import (
     PortfolioBusyError,
@@ -88,6 +90,9 @@ def create_account(request: PortfolioAccountCreateRequest) -> PortfolioAccountIt
             market=request.market,
             base_currency=request.base_currency,
             owner_id=request.owner_id,
+            account_type=request.account_type,
+            financing_debt=request.financing_debt,
+            min_maintenance_ratio=request.min_maintenance_ratio,
         )
         return PortfolioAccountItem(**row)
     except ValueError as exc:
@@ -129,6 +134,9 @@ def update_account(account_id: int, request: PortfolioAccountUpdateRequest) -> P
             market=request.market,
             base_currency=request.base_currency,
             owner_id=request.owner_id,
+            account_type=request.account_type,
+            financing_debt=request.financing_debt,
+            min_maintenance_ratio=request.min_maintenance_ratio,
             is_active=request.is_active,
         )
         if updated is None:
@@ -674,3 +682,33 @@ def get_risk_report(
         raise _bad_request(exc)
     except Exception as exc:
         raise _internal_error("Get risk report failed", exc)
+
+
+@router.get(
+    "/personal-dashboard",
+    response_model=PersonalQuantDashboardResponse,
+    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Get personal quant trading dashboard",
+)
+def get_personal_dashboard(
+    account_id: Optional[int] = Query(None, description="Optional account id"),
+    as_of: Optional[date] = Query(None, description="Dashboard date, default today"),
+    cost_method: str = Query("fifo", description="Cost method: fifo or avg"),
+    include_realtime: bool = Query(
+        True,
+        description="Whether today's dashboard should try realtime quotes before historical close fallback",
+    ),
+) -> PersonalQuantDashboardResponse:
+    service = PersonalQuantService()
+    try:
+        data = service.get_dashboard(
+            account_id=account_id,
+            as_of=as_of,
+            cost_method=cost_method,
+            include_realtime=include_realtime,
+        )
+        return PersonalQuantDashboardResponse(**data)
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:
+        raise _internal_error("Get personal dashboard failed", exc)

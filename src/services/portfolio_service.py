@@ -36,6 +36,7 @@ VALID_COST_METHODS = {"fifo", "avg"}
 VALID_SIDES = {"buy", "sell"}
 VALID_CASH_DIRECTIONS = {"in", "out"}
 VALID_CORPORATE_ACTIONS = {"cash_dividend", "split_adjustment"}
+VALID_ACCOUNT_TYPES = {"cash", "margin"}
 PORTFOLIO_FX_REFRESH_DISABLED_REASON = "portfolio_fx_update_disabled"
 PORTFOLIO_REALTIME_QUOTE_MAX_WORKERS = 4
 
@@ -123,18 +124,27 @@ class PortfolioService:
         market: str,
         base_currency: str,
         owner_id: Optional[str] = None,
+        account_type: str = "cash",
+        financing_debt: float = 0.0,
+        min_maintenance_ratio: float = 1.5,
     ) -> Dict[str, Any]:
         name_norm = (name or "").strip()
         if not name_norm:
             raise ValueError("name is required")
         market_norm = self._normalize_market(market)
         base_currency_norm = self._normalize_currency(base_currency)
+        account_type_norm = self._normalize_account_type(account_type)
+        financing_debt_norm = self._normalize_non_negative_float(financing_debt, "financing_debt")
+        min_maintenance_ratio_norm = self._normalize_min_maintenance_ratio(min_maintenance_ratio)
         row = self.repo.create_account(
             name=name_norm,
             broker=(broker or "").strip() or None,
             market=market_norm,
             base_currency=base_currency_norm,
             owner_id=(owner_id or "").strip() or None,
+            account_type=account_type_norm,
+            financing_debt=financing_debt_norm,
+            min_maintenance_ratio=min_maintenance_ratio_norm,
         )
         return self._account_to_dict(row)
 
@@ -151,6 +161,9 @@ class PortfolioService:
         market: Optional[str] = None,
         base_currency: Optional[str] = None,
         owner_id: Optional[str] = None,
+        account_type: Optional[str] = None,
+        financing_debt: Optional[float] = None,
+        min_maintenance_ratio: Optional[float] = None,
         is_active: Optional[bool] = None,
     ) -> Optional[Dict[str, Any]]:
         fields: Dict[str, Any] = {}
@@ -167,6 +180,12 @@ class PortfolioService:
             fields["base_currency"] = self._normalize_currency(base_currency)
         if owner_id is not None:
             fields["owner_id"] = owner_id.strip() or None
+        if account_type is not None:
+            fields["account_type"] = self._normalize_account_type(account_type)
+        if financing_debt is not None:
+            fields["financing_debt"] = self._normalize_non_negative_float(financing_debt, "financing_debt")
+        if min_maintenance_ratio is not None:
+            fields["min_maintenance_ratio"] = self._normalize_min_maintenance_ratio(min_maintenance_ratio)
         if is_active is not None:
             fields["is_active"] = bool(is_active)
         if not fields:
@@ -957,6 +976,9 @@ class PortfolioService:
 
         unrealized_pnl_base = market_value_base - total_cost_base
         total_equity_base = total_cash_base + market_value_base
+        financing_debt = max(0.0, float(getattr(account, "financing_debt", 0.0) or 0.0))
+        net_asset = total_equity_base - financing_debt
+        maintenance_ratio = (total_equity_base / financing_debt) if financing_debt > EPS else None
         position_limitations = [
             limitation
             for position in position_rows
@@ -974,6 +996,11 @@ class PortfolioService:
             "broker": account.broker,
             "market": account.market,
             "base_currency": account.base_currency,
+            "account_type": getattr(account, "account_type", "cash") or "cash",
+            "financing_debt": round(financing_debt, 6),
+            "net_asset": round(net_asset, 6),
+            "maintenance_ratio": round(maintenance_ratio, 6) if maintenance_ratio is not None else None,
+            "min_maintenance_ratio": round(float(getattr(account, "min_maintenance_ratio", 1.5) or 1.5), 6),
             "as_of": as_of_date.isoformat(),
             "cost_method": cost_method,
             "total_cash": round(total_cash_base, 6),
@@ -1656,10 +1683,40 @@ class PortfolioService:
             "broker": row.broker,
             "market": row.market,
             "base_currency": row.base_currency,
+            "account_type": getattr(row, "account_type", "cash") or "cash",
+            "financing_debt": float(getattr(row, "financing_debt", 0.0) or 0.0),
+            "min_maintenance_ratio": float(getattr(row, "min_maintenance_ratio", 1.5) or 1.5),
             "is_active": bool(row.is_active),
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
+
+    @staticmethod
+    def _normalize_account_type(value: str) -> str:
+        normalized = (value or "cash").strip().lower()
+        if normalized not in VALID_ACCOUNT_TYPES:
+            raise ValueError(f"Unsupported account_type: {value}")
+        return normalized
+
+    @staticmethod
+    def _normalize_non_negative_float(value: float, field_name: str) -> float:
+        try:
+            numeric = float(value or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name} must be numeric") from exc
+        if numeric < 0:
+            raise ValueError(f"{field_name} must be non-negative")
+        return numeric
+
+    @staticmethod
+    def _normalize_min_maintenance_ratio(value: float) -> float:
+        try:
+            numeric = float(value or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("min_maintenance_ratio must be numeric") from exc
+        if numeric <= 0:
+            raise ValueError("min_maintenance_ratio must be positive")
+        return numeric
 
     @staticmethod
     def _trade_row_to_dict(row: Any) -> Dict[str, Any]:

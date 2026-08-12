@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 - [改进] AIHubMix 注册与引流链接统一使用 inferera.com，改善中国大陆网络直连体验。
 
+- [feat] Add personal quant dashboard overlay for cash/margin accounts, financing debt, maintenance ratio risk, and daily action plan.
+
 ## [3.30.0] - 2026-08-09
 
 ### 发布亮点

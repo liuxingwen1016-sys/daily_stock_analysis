@@ -16,6 +16,7 @@ import type {
   PortfolioImportBrokerListResponse,
   PortfolioImportCommitResponse,
   PortfolioImportParseResponse,
+  PersonalQuantDashboardResponse,
   PortfolioPositionAnalysisRequest,
   PortfolioRiskResponse,
   PortfolioSnapshotResponse,
@@ -120,6 +121,9 @@ export const portfolioApi = {
       market: payload.market,
       base_currency: payload.baseCurrency,
       owner_id: payload.ownerId,
+      account_type: payload.accountType ?? 'cash',
+      financing_debt: payload.financingDebt ?? 0,
+      min_maintenance_ratio: payload.minMaintenanceRatio ?? 1.5,
     });
     return toCamelCase<PortfolioAccountItem>(response.data);
   },
@@ -153,6 +157,13 @@ export const portfolioApi = {
       params: buildSnapshotParams(query),
     });
     return toCamelCase<PortfolioRiskResponse>(response.data);
+  },
+
+  async getPersonalDashboard(query: SnapshotQuery = {}): Promise<PersonalQuantDashboardResponse> {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/personal-dashboard', {
+      params: buildSnapshotParams(query),
+    });
+    return toCamelCase<PersonalQuantDashboardResponse>(response.data);
   },
 
   async refreshFx(query: FxRefreshQuery = {}): Promise<PortfolioFxRefreshResponse> {

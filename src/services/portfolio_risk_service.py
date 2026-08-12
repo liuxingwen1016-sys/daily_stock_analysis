@@ -85,6 +85,7 @@ class PortfolioRiskService:
             lookback_days=thresholds["lookback_days"],
         )
         stop_loss = self._build_stop_loss(snapshot, thresholds)
+        margin_risk = self._build_margin_risk(snapshot)
         decision_signal_risk = self._build_decision_signal_risk(snapshot)
 
         return {
@@ -97,7 +98,77 @@ class PortfolioRiskService:
             "sector_concentration": sector_concentration,
             "drawdown": drawdown,
             "stop_loss": stop_loss,
+            "margin_risk": margin_risk,
             "decision_signal_risk": decision_signal_risk,
+        }
+
+    @staticmethod
+    def _build_margin_risk(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        accounts: List[Dict[str, Any]] = []
+        level_rank = {"safe": 0, "watch": 1, "warning": 2, "danger": 3, "unknown": 4}
+        total_debt = 0.0
+        total_net_asset = 0.0
+
+        for account in snapshot.get("accounts", []) or []:
+            account_type = str(account.get("account_type") or "cash").strip().lower()
+            debt = max(0.0, float(account.get("financing_debt") or 0.0))
+            equity = float(account.get("total_equity") or 0.0)
+            min_ratio = float(account.get("min_maintenance_ratio") or 1.5)
+            ratio = account.get("maintenance_ratio")
+            ratio_value = float(ratio) if ratio is not None else None
+
+            if account_type != "margin" and debt <= 0:
+                level = "safe"
+                message = "cash account"
+            elif debt <= 0:
+                level = "safe"
+                message = "margin account without financing debt"
+            elif ratio_value is None:
+                level = "unknown"
+                message = "maintenance ratio unavailable"
+            elif ratio_value < min_ratio:
+                level = "danger"
+                message = "below maintenance floor"
+            elif ratio_value < min_ratio + 0.3:
+                level = "warning"
+                message = "close to maintenance floor"
+            elif ratio_value < min_ratio + 0.7:
+                level = "watch"
+                message = "needs margin buffer watch"
+            else:
+                level = "safe"
+                message = "margin buffer is healthy"
+
+            total_debt += debt
+            total_net_asset += equity - debt
+            accounts.append({
+                "account_id": account.get("account_id"),
+                "account_name": account.get("account_name"),
+                "account_type": account_type,
+                "broker": account.get("broker"),
+                "currency": account.get("base_currency"),
+                "total_equity": round(equity, 6),
+                "financing_debt": round(debt, 6),
+                "net_asset": round(equity - debt, 6),
+                "maintenance_ratio": round(ratio_value, 6) if ratio_value is not None else None,
+                "min_maintenance_ratio": round(min_ratio, 6),
+                "level": level,
+                "message": message,
+            })
+
+        worst = max(accounts, key=lambda item: level_rank.get(str(item.get("level")), 0), default=None)
+        margin_accounts = [
+            item for item in accounts
+            if item.get("account_type") == "margin" or float(item.get("financing_debt") or 0.0) > 0
+        ]
+        return {
+            "available": True,
+            "total_financing_debt": round(total_debt, 6),
+            "total_net_asset": round(total_net_asset, 6),
+            "margin_account_count": len(margin_accounts),
+            "alert": bool(worst and str(worst.get("level")) in {"warning", "danger", "unknown"}),
+            "worst_level": worst.get("level") if worst else "safe",
+            "accounts": accounts,
         }
 
     def _build_decision_signal_risk(

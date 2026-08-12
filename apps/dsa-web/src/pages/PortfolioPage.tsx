@@ -35,6 +35,7 @@ import type {
 } from '../types/decisionSignals';
 import type {
   PortfolioAccountItem,
+  PortfolioAccountType,
   PortfolioCashDirection,
   PortfolioCashLedgerListItem,
   PortfolioCorporateActionListItem,
@@ -200,6 +201,9 @@ const PortfolioPage: React.FC = () => {
     broker: 'Demo',
     market: 'cn' as PortfolioAccountMarket,
     baseCurrency: 'CNY',
+    accountType: 'cash' as PortfolioAccountType,
+    financingDebt: '',
+    minMaintenanceRatio: '1.5',
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
   const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
@@ -814,6 +818,9 @@ const PortfolioPage: React.FC = () => {
         broker: accountForm.broker.trim() || undefined,
         market: accountForm.market,
         baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
+        accountType: accountForm.accountType,
+        financingDebt: Number(accountForm.financingDebt || 0),
+        minMaintenanceRatio: Number(accountForm.minMaintenanceRatio || 1.5),
       });
       await loadAccounts();
       setSelectedAccount(created.id);
@@ -824,6 +831,9 @@ const PortfolioPage: React.FC = () => {
         broker: 'Demo',
         market: accountForm.market,
         baseCurrency: accountForm.baseCurrency,
+        accountType: accountForm.accountType,
+        financingDebt: '',
+        minMaintenanceRatio: accountForm.minMaintenanceRatio,
       });
       setAccountCreateSuccess('账户创建成功，已自动切换到该账户。');
     } catch (err) {
@@ -1124,6 +1134,32 @@ const PortfolioPage: React.FC = () => {
               <option value="kr">市场：韩股（kr）</option>
               <option value="tw">市场：台股（tw）</option>
             </select>
+            <select
+              className={PORTFOLIO_SELECT_CLASS}
+              value={accountForm.accountType}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, accountType: e.target.value as PortfolioAccountType }))}
+            >
+              <option value="cash">Account type: cash</option>
+              <option value="margin">Account type: margin</option>
+            </select>
+            <input
+              className={PORTFOLIO_INPUT_CLASS}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Financing debt"
+              value={accountForm.financingDebt}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, financingDebt: e.target.value }))}
+            />
+            <input
+              className={PORTFOLIO_INPUT_CLASS}
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Min maintenance ratio, e.g. 1.5"
+              value={accountForm.minMaintenanceRatio}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, minMaintenanceRatio: e.target.value }))}
+            />
             <button type="submit" className="btn-secondary text-sm" disabled={accountCreating}>
               {accountCreating ? '创建中...' : '创建账户'}
             </button>

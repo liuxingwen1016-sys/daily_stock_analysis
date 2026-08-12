@@ -524,6 +524,9 @@ class PortfolioAccount(Base):
     broker = Column(String(64))
     market = Column(String(8), nullable=False, default='cn', index=True)  # cn/hk/us
     base_currency = Column(String(8), nullable=False, default='CNY')
+    account_type = Column(String(16), nullable=False, default='cash', index=True)
+    financing_debt = Column(Float, nullable=False, default=0.0)
+    min_maintenance_ratio = Column(Float, nullable=False, default=1.5)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -1370,6 +1373,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
             # 创建所有表
             Base.metadata.create_all(self._engine)
+            self._ensure_portfolio_account_personal_columns()
             self._ensure_llm_usage_telemetry_columns()
             self._ensure_decision_signal_profile_schema()
             self._ensure_intelligence_item_scope_values()
@@ -1454,6 +1458,42 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         self._ensure_decision_signal_profile_indexes()
         self._backfill_decision_signal_profile_from_metadata()
+
+    def _ensure_portfolio_account_personal_columns(self) -> None:
+        """Add personal account metadata columns for existing SQLite DBs."""
+
+        if not self._is_sqlite_engine:
+            return
+        inspector = inspect(self._engine)
+        if not inspector.has_table(PortfolioAccount.__tablename__):
+            return
+
+        existing = {
+            column["name"]
+            for column in inspector.get_columns(PortfolioAccount.__tablename__)
+        }
+        columns = {
+            "account_type": "VARCHAR(16) NOT NULL DEFAULT 'cash'",
+            "financing_debt": "FLOAT NOT NULL DEFAULT 0.0",
+            "min_maintenance_ratio": "FLOAT NOT NULL DEFAULT 1.5",
+        }
+        for name, ddl in columns.items():
+            if name in existing:
+                continue
+            try:
+                with self._engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {PortfolioAccount.__tablename__} "
+                        f"ADD COLUMN {name} {ddl}"
+                    )
+            except OperationalError as exc:
+                if not self._is_sqlite_duplicate_column_error(exc, name):
+                    raise
+        with self._engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_portfolio_accounts_account_type "
+                "ON portfolio_accounts (account_type)"
+            )
 
     def _ensure_decision_signal_profile_indexes(self) -> None:
         """Create profile-aware indexes without dropping legacy indexes."""

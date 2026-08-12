@@ -4,6 +4,7 @@ export type PortfolioCostMethod = 'fifo' | 'avg';
 export type PortfolioSide = 'buy' | 'sell';
 export type PortfolioCashDirection = 'in' | 'out';
 export type PortfolioCorporateActionType = 'cash_dividend' | 'split_adjustment';
+export type PortfolioAccountType = 'cash' | 'margin';
 
 export interface PortfolioAccountItem {
   id: number;
@@ -12,6 +13,9 @@ export interface PortfolioAccountItem {
   broker?: string | null;
   market: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency: string;
+  accountType?: PortfolioAccountType;
+  financingDebt?: number;
+  minMaintenanceRatio?: number;
   isActive: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -27,6 +31,9 @@ export interface PortfolioAccountCreateRequest {
   market: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency: string;
   ownerId?: string;
+  accountType?: PortfolioAccountType;
+  financingDebt?: number;
+  minMaintenanceRatio?: number;
 }
 
 export interface PortfolioPositionItem {
@@ -63,6 +70,11 @@ export interface PortfolioAccountSnapshot {
   broker?: string | null;
   market: string;
   baseCurrency: string;
+  accountType?: PortfolioAccountType;
+  financingDebt?: number;
+  netAsset?: number;
+  maintenanceRatio?: number | null;
+  minMaintenanceRatio?: number;
   asOf: string;
   costMethod: PortfolioCostMethod;
   totalCash: number;
@@ -148,6 +160,31 @@ export interface PortfolioDecisionSignalRiskBlock {
   items: PortfolioDecisionSignalRiskItem[];
 }
 
+export interface PortfolioMarginRiskAccount {
+  accountId?: number | null;
+  accountName?: string | null;
+  accountType: PortfolioAccountType | string;
+  broker?: string | null;
+  currency?: string | null;
+  totalEquity: number;
+  financingDebt: number;
+  netAsset: number;
+  maintenanceRatio?: number | null;
+  minMaintenanceRatio: number;
+  level: 'safe' | 'watch' | 'warning' | 'danger' | 'unknown' | string;
+  message: string;
+}
+
+export interface PortfolioMarginRiskBlock {
+  available: boolean;
+  totalFinancingDebt: number;
+  totalNetAsset: number;
+  marginAccountCount: number;
+  alert: boolean;
+  worstLevel: string;
+  accounts: PortfolioMarginRiskAccount[];
+}
+
 export interface PortfolioRiskResponse {
   asOf: string;
   accountId?: number | null;
@@ -175,7 +212,21 @@ export interface PortfolioRiskResponse {
     nearCount: number;
     items: PortfolioStopLossItem[];
   };
+  marginRisk?: PortfolioMarginRiskBlock;
   decisionSignalRisk?: PortfolioDecisionSignalRiskBlock;
+}
+
+export interface PersonalQuantDashboardResponse {
+  asOf: string;
+  costMethod: PortfolioCostMethod;
+  currency: string;
+  summary: Record<string, unknown>;
+  principles: Record<string, unknown>[];
+  accountTemplates: Record<string, unknown>[];
+  accounts: Record<string, unknown>[];
+  topPositions: Record<string, unknown>[];
+  riskEvents: Record<string, unknown>[];
+  actionPlan: Record<string, unknown>[];
 }
 
 export interface PortfolioTradeCreateRequest {
